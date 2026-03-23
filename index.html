@@ -72,45 +72,34 @@ let boldActive = false;
 let italicActive = false;
 let selectedColor = colorBtn.value;
 
-// Keyboard shortcuts: toggle bold/italic states
+// Toggle bold/italic
 teleText.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'b') { e.preventDefault(); boldActive = !boldActive; updatePreview(); }
   if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); italicActive = !italicActive; updatePreview(); }
 });
 
 // Update selected color live
-colorBtn.addEventListener('input', () => {
-  selectedColor = colorBtn.value;
-  updatePreview();
-});
+colorBtn.addEventListener('input', () => { selectedColor = colorBtn.value; updatePreview(); });
 
-// Update text alignment
+// Update alignment
 alignSelect.addEventListener('change', () => updatePreview());
 
-// Update preview: apply formatting only here
+// Update preview: formatting only in preview
 function updatePreview() {
-  const text = teleText.innerText; // plain editor text
+  const text = teleText.innerText;
   let formattedText = text;
-
-  // Wrap with bold/italic tags
   if (boldActive) formattedText = `<b>${formattedText}</b>`;
   if (italicActive) formattedText = `<i>${formattedText}</i>`;
-
-  // Apply color
   formattedText = `<span style="color:${selectedColor}">${formattedText}</span>`;
-
-  // Update preview
   preview.innerHTML = formattedText;
   preview.style.fontSize = fontSize.value + 'px';
   preview.style.fontFamily = fontFamily.value;
   preview.style.lineHeight = lineHeight.value;
   preview.style.textAlign = alignSelect.value;
-
-  // Update fullscreen if open
   updateFullscreen();
 }
 
-// Fullscreen
+// Open fullscreen
 function openFullscreen() {
   if (!fullscreenWindow || fullscreenWindow.closed) {
     fullscreenWindow = window.open('', 'fullscreenTeleprompter', 'width=800,height=600');
@@ -129,24 +118,25 @@ function openFullscreen() {
       </head>
       <body id="content">${preview.innerHTML}</body>
       <script>
-        let scrollInterval = null;
+        let scrollSpeed = 0;
+        let animationId;
 
-        function startScroll(speed) {
-          clearInterval(scrollInterval);
-          scrollInterval = setInterval(() => { window.scrollBy(0, speed); }, 20);
+        function scrollStep() {
+          if(scrollSpeed!==0) { window.scrollBy(0, scrollSpeed); }
+          animationId = requestAnimationFrame(scrollStep);
         }
-
-        function stopScroll() { clearInterval(scrollInterval); }
+        scrollStep();
 
         document.addEventListener('keydown', e => {
           switch(e.key) {
-            case '1': startScroll(1); break;
-            case '2': startScroll(3); break;
-            case '3': startScroll(6); break;
-            case '4': startScroll(-1); break;
-            case '5': startScroll(-3); break;
-            case '6': startScroll(-6); break;
-            case ' ': stopScroll(); break;
+            case '1': scrollSpeed = 1; break;
+            case '2': scrollSpeed = 3; break;
+            case '3': scrollSpeed = 6; break;
+            case '4': scrollSpeed = -1; break;
+            case '5': scrollSpeed = -3; break;
+            case '6': scrollSpeed = -6; break;
+            case ' ': scrollSpeed = 0; break;
+            case '0': window.scrollTo({top:0}); break;
           }
         });
 
@@ -164,7 +154,7 @@ function openFullscreen() {
   }
 }
 
-// Update fullscreen content
+// Update fullscreen
 function updateFullscreen() {
   if (fullscreenWindow && !fullscreenWindow.closed) {
     fullscreenWindow.postMessage({
