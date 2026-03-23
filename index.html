@@ -8,12 +8,13 @@
 <style>
   body { font-family: Arial; margin:0; display:flex; height:100vh; }
   #editor { width:30%; padding:10px; box-sizing:border-box; border-right:2px solid #ccc; overflow-y:auto; background:white; color:black; }
-  #editor h2 { font-size:18px; margin-bottom:10px; }
+  #editor h2 { font-size:18px; margin-bottom:5px; }
+  #currentTitle { font-size:12px; color:gray; margin-bottom:10px; }
   #editor label { display:block; font-size:12px; margin-top:8px; }
   #editor input, #editor select, #editor button { width:100%; padding:5px; margin-top:3px; font-size:14px; box-sizing:border-box; transition: transform 0.2s; }
   #editor button:hover { transform: scale(1.1); }
   #teleText { height:150px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; background:white; color:black; }
-  #fullscreenBtn, #saveTxtBtn { margin-top:10px; font-size:14px; }
+  #fullscreenBtn, #saveTxtBtn, #newBtn { margin-top:10px; font-size:14px; }
   #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; white-space:pre-wrap; }
   #playlist { margin-top:15px; border-top:1px solid #ccc; padding-top:10px; }
   #playlist h3 { margin:5px 0; }
@@ -27,6 +28,7 @@
 
 <div id="editor">
   <h2>PSJC Teleprompter</h2>
+  <div id="currentTitle">No teleprompter loaded</div>
 
   <label>Text:</label>
   <div id="teleText" contenteditable="true">Hello, this is your teleprompter text.</div>
@@ -59,6 +61,7 @@
 
   <button id="fullscreenBtn">Go Fullscreen</button>
   <button id="saveTxtBtn">Save as .txt</button>
+  <button id="newBtn">New Teleprompter</button>
 
   <hr>
   <h3>Playlist</h3>
@@ -84,6 +87,8 @@ const saveBtn = document.getElementById('saveBtn');
 const saveName = document.getElementById('saveName');
 const playlistList = document.getElementById('playlistList');
 const saveTxtBtn = document.getElementById('saveTxtBtn');
+const newBtn = document.getElementById('newBtn');
+const currentTitle = document.getElementById('currentTitle');
 
 let boldActive = false;
 let italicActive = false;
@@ -115,6 +120,7 @@ function updatePreview() {
   preview.style.textAlign = alignSelect.value;
   updateFullscreen();
   autoSaveCurrent();
+  updateTitleDisplay();
 }
 
 // Fullscreen
@@ -181,11 +187,16 @@ saveBtn.addEventListener('click', () => {
   saveName.value='';
 });
 
-// Save as .txt
+// Save as .txt with formatting markers
 saveTxtBtn.addEventListener('click', () => {
   if (!teleText.innerText.trim()) return alert("Teleprompter is empty!");
-  const textToSave = teleText.innerText;
-  const blob = new Blob([textToSave], { type: "text/plain" });
+  let textContent = teleText.innerText;
+  // apply formatting markers
+  if(boldActive) textContent = `*${textContent}*`;
+  if(italicActive) textContent = `_${textContent}_`;
+  if(boldActive && italicActive) textContent = `*_${teleText.innerText}_*`;
+
+  const blob = new Blob([textContent], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -195,6 +206,20 @@ saveTxtBtn.addEventListener('click', () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// New teleprompter
+newBtn.addEventListener('click', () => {
+  currentLoadedName = null;
+  teleText.innerHTML = '';
+  boldActive = false;
+  italicActive = false;
+  selectedColor = "#ffffff";
+  fontSize.value = 48;
+  fontFamily.value = "Arial";
+  lineHeight.value = 1.5;
+  alignSelect.value = "left";
+  updatePreview();
 });
 
 // Save function
@@ -213,13 +238,19 @@ function saveTeleprompter(name){
   if(!playlistOrder.includes(name)) playlistOrder.push(name);
   localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
   currentLoadedName = name;
+  updateTitleDisplay();
   loadPlaylist();
+}
+
+// Update title display
+function updateTitleDisplay(){
+  currentTitle.textContent = currentLoadedName ? "Editing: " + currentLoadedName : "No teleprompter loaded";
 }
 
 // Auto-save currently loaded teleprompter
 function autoSaveCurrent(){ if(currentLoadedName) saveTeleprompter(currentLoadedName); }
 
-// Playlist management with fixed Load
+// Playlist management
 let playlistOrder = JSON.parse(localStorage.getItem('playlistOrder') || '[]');
 function loadPlaylist(){
   playlistList.innerHTML = '';
@@ -241,6 +272,7 @@ function loadPlaylist(){
       playlistOrder = playlistOrder.filter(n=>n!==teleName);
       localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
       if(currentLoadedName===teleName) currentLoadedName=null;
+      updateTitleDisplay();
       loadPlaylist();
     }})();
 
@@ -291,6 +323,7 @@ function loadTeleprompter(name){
   italicActive = data.italic;
   selectedColor = data.color;
   currentLoadedName = name;
+  updateTitleDisplay();
   updatePreview();
 }
 
