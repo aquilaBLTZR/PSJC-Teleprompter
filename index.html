@@ -11,15 +11,15 @@
   #editor h2 { font-size:18px; margin-bottom:10px; }
   #editor label { display:block; font-size:12px; margin-top:8px; }
   #editor input, #editor select, #editor button { width:100%; padding:5px; margin-top:3px; font-size:14px; box-sizing:border-box; }
-  #teleText { height:100px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; }
+  #teleText { height:150px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; }
   #fullscreenBtn { margin-top:10px; font-size:14px; }
-  #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; }
+  #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; white-space:pre-wrap; }
 </style>
 </head>
 <body>
 
 <div id="editor">
-  <h2>PSJC Teleprompter</h2>
+  <h2>Teleprompter Editor</h2>
 
   <label>Text:</label>
   <div id="teleText" contenteditable="true">Hello, this is your teleprompter text.</div>
@@ -67,59 +67,46 @@ const preview = document.getElementById('preview');
 const colorBtn = document.getElementById('colorBtn');
 const alignSelect = document.getElementById('alignSelect');
 
-// Save and restore selection
-function saveSelection() {
-  const sel = window.getSelection();
-  if (sel.rangeCount > 0) return sel.getRangeAt(0).cloneRange();
-  return null;
-}
-function restoreSelection(range) {
-  if (range) {
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
-}
+// Track formatting states
+let boldActive = false;
+let italicActive = false;
+let selectedColor = colorBtn.value;
 
-// Apply color to selected text without changing editor code
-function applyColor(color) {
-  const range = saveSelection();
-  if (!range || range.collapsed) return;
-  const span = document.createElement('span');
-  span.style.color = color;
-  span.appendChild(range.extractContents());
-  range.insertNode(span);
-  const newRange = document.createRange();
-  newRange.selectNodeContents(span);
-  restoreSelection(newRange);
-  updatePreview();
-}
-
-// Apply alignment
-function applyAlignment(alignment) {
-  preview.style.textAlign = alignment;
-  teleText.style.textAlign = alignment;
-  updateFullscreen();
-}
-
-// Keyboard shortcuts
+// Keyboard shortcuts: toggle bold/italic states
 teleText.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key.toLowerCase() === 'b') { e.preventDefault(); document.execCommand('bold'); updatePreview(); }
-  if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); document.execCommand('italic'); updatePreview(); }
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') { e.preventDefault(); boldActive = !boldActive; updatePreview(); }
+  if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); italicActive = !italicActive; updatePreview(); }
 });
 
-// Live color update while dragging
-colorBtn.addEventListener('input', () => applyColor(colorBtn.value));
+// Update selected color live
+colorBtn.addEventListener('input', () => {
+  selectedColor = colorBtn.value;
+  updatePreview();
+});
 
-// Alignment change
-alignSelect.addEventListener('change', () => applyAlignment(alignSelect.value));
+// Update text alignment
+alignSelect.addEventListener('change', () => updatePreview());
 
-// Update preview
+// Update preview: apply formatting only here
 function updatePreview() {
-  preview.innerHTML = teleText.innerHTML;
+  const text = teleText.innerText; // plain editor text
+  let formattedText = text;
+
+  // Wrap with bold/italic tags
+  if (boldActive) formattedText = `<b>${formattedText}</b>`;
+  if (italicActive) formattedText = `<i>${formattedText}</i>`;
+
+  // Apply color
+  formattedText = `<span style="color:${selectedColor}">${formattedText}</span>`;
+
+  // Update preview
+  preview.innerHTML = formattedText;
   preview.style.fontSize = fontSize.value + 'px';
   preview.style.fontFamily = fontFamily.value;
   preview.style.lineHeight = lineHeight.value;
+  preview.style.textAlign = alignSelect.value;
+
+  // Update fullscreen if open
   updateFullscreen();
 }
 
@@ -134,19 +121,35 @@ function openFullscreen() {
         <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
         <style>
           body {
-            margin:0; background:black; color:white;
-            font-size:${fontSize.value}px;
-            font-family:${fontFamily.value};
-            line-height:${lineHeight.value};
-            padding:50px;
-            text-align:${alignSelect.value};
+            margin:0; background:black; color:white; padding:50px;
+            font-size:${fontSize.value}px; font-family:${fontFamily.value};
+            line-height:${lineHeight.value}; text-align:${alignSelect.value}; white-space:pre-wrap;
           }
         </style>
       </head>
       <body id="content">${preview.innerHTML}</body>
       <script>
-        document.addEventListener('keydown', e => { if(e.key==='ArrowDown') window.scrollBy(0,5); if(e.key==='ArrowUp') window.scrollBy(0,-5); });
-        document.addEventListener('wheel', e => window.scrollBy(0,e.deltaY));
+        let scrollInterval = null;
+
+        function startScroll(speed) {
+          clearInterval(scrollInterval);
+          scrollInterval = setInterval(() => { window.scrollBy(0, speed); }, 20);
+        }
+
+        function stopScroll() { clearInterval(scrollInterval); }
+
+        document.addEventListener('keydown', e => {
+          switch(e.key) {
+            case '1': startScroll(1); break;
+            case '2': startScroll(3); break;
+            case '3': startScroll(6); break;
+            case '4': startScroll(-1); break;
+            case '5': startScroll(-3); break;
+            case '6': startScroll(-6); break;
+            case ' ': stopScroll(); break;
+          }
+        });
+
         window.addEventListener('message', e => {
           if(e.data.content!==undefined) document.getElementById('content').innerHTML=e.data.content;
           if(e.data.fontSize!==undefined) document.body.style.fontSize=e.data.fontSize+'px';
@@ -161,6 +164,7 @@ function openFullscreen() {
   }
 }
 
+// Update fullscreen content
 function updateFullscreen() {
   if (fullscreenWindow && !fullscreenWindow.closed) {
     fullscreenWindow.postMessage({
