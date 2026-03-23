@@ -13,7 +13,7 @@
   #editor input, #editor select, #editor button { width:100%; padding:5px; margin-top:3px; font-size:14px; box-sizing:border-box; transition: transform 0.2s; }
   #editor button:hover { transform: scale(1.1); }
   #teleText { height:150px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; background:white; color:black; }
-  #fullscreenBtn { margin-top:10px; font-size:14px; }
+  #fullscreenBtn, #saveTxtBtn { margin-top:10px; font-size:14px; }
   #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; white-space:pre-wrap; }
   #playlist { margin-top:15px; border-top:1px solid #ccc; padding-top:10px; }
   #playlist h3 { margin:5px 0; }
@@ -58,12 +58,12 @@
   <input type="color" id="colorBtn" value="#ffffff">
 
   <button id="fullscreenBtn">Go Fullscreen</button>
+  <button id="saveTxtBtn">Save as .txt</button>
 
   <hr>
   <h3>Playlist</h3>
   <input type="text" id="saveName" placeholder="Enter teleprompter name">
   <button id="saveBtn">Save</button>
-  <button id="importBtn">Import</button>
   <ul id="playlistList"></ul>
 </div>
 
@@ -71,7 +71,7 @@
 
 <script>
 let fullscreenWindow = null;
-let currentLoadedName = null; // Keep track of currently loaded teleprompter
+let currentLoadedName = null;
 const teleText = document.getElementById('teleText');
 const fontSize = document.getElementById('fontSize');
 const fontFamily = document.getElementById('fontFamily');
@@ -81,9 +81,9 @@ const preview = document.getElementById('preview');
 const colorBtn = document.getElementById('colorBtn');
 const alignSelect = document.getElementById('alignSelect');
 const saveBtn = document.getElementById('saveBtn');
-const importBtn = document.getElementById('importBtn');
 const saveName = document.getElementById('saveName');
 const playlistList = document.getElementById('playlistList');
+const saveTxtBtn = document.getElementById('saveTxtBtn');
 
 let boldActive = false;
 let italicActive = false;
@@ -181,11 +181,20 @@ saveBtn.addEventListener('click', () => {
   saveName.value='';
 });
 
-// Import button
-importBtn.addEventListener('click', () => {
-  if(playlistOrder.length === 0) return alert("No saved teleprompters to import.");
-  let firstName = playlistOrder[0];
-  loadTeleprompter(firstName);
+// Save as .txt
+saveTxtBtn.addEventListener('click', () => {
+  if (!teleText.innerText.trim()) return alert("Teleprompter is empty!");
+  const textToSave = teleText.innerText;
+  const blob = new Blob([textToSave], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const filename = currentLoadedName ? currentLoadedName + ".txt" : "teleprompter.txt";
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 });
 
 // Save function
@@ -208,9 +217,7 @@ function saveTeleprompter(name){
 }
 
 // Auto-save currently loaded teleprompter
-function autoSaveCurrent(){
-  if(currentLoadedName) saveTeleprompter(currentLoadedName);
-}
+function autoSaveCurrent(){ if(currentLoadedName) saveTeleprompter(currentLoadedName); }
 
 // Playlist management
 let playlistOrder = JSON.parse(localStorage.getItem('playlistOrder') || '[]');
