@@ -219,24 +219,31 @@ function saveTeleprompter(name){
 // Auto-save currently loaded teleprompter
 function autoSaveCurrent(){ if(currentLoadedName) saveTeleprompter(currentLoadedName); }
 
-// Playlist management
+// Playlist management with fixed Load
 let playlistOrder = JSON.parse(localStorage.getItem('playlistOrder') || '[]');
 function loadPlaylist(){
   playlistList.innerHTML = '';
   playlistOrder.forEach(name=>{
-    if(!localStorage.getItem('teleprompter_'+name)) return;
+    const key = 'teleprompter_' + name;
+    const dataStr = localStorage.getItem(key);
+    if(!dataStr) return;
     const li = document.createElement('li'); li.draggable=true;
+
     li.innerHTML = `<span>${name}</span>`;
-    const loadBtn = document.createElement('button'); loadBtn.textContent='Load';
-    loadBtn.onclick = ()=>loadTeleprompter(name);
-    const deleteBtn = document.createElement('button'); deleteBtn.textContent='Delete';
-    deleteBtn.onclick = ()=>{
-      localStorage.removeItem('teleprompter_'+name);
-      playlistOrder = playlistOrder.filter(n=>n!==name);
+    const loadBtn = document.createElement('button'); 
+    loadBtn.textContent = 'Load';
+    loadBtn.onclick = (() => { const teleName = name; return () => loadTeleprompter(teleName); })();
+
+    const deleteBtn = document.createElement('button'); 
+    deleteBtn.textContent='Delete';
+    deleteBtn.onclick = (() => { const teleName = name; return () => {
+      localStorage.removeItem('teleprompter_'+teleName);
+      playlistOrder = playlistOrder.filter(n=>n!==teleName);
       localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
-      if(currentLoadedName===name) currentLoadedName=null;
+      if(currentLoadedName===teleName) currentLoadedName=null;
       loadPlaylist();
-    };
+    }})();
+
     li.appendChild(loadBtn); li.appendChild(deleteBtn);
     playlistList.appendChild(li);
 
@@ -269,10 +276,12 @@ function getDragAfterElement(container, y){
   }, {offset:Number.NEGATIVE_INFINITY}).element || null;
 }
 
-// Load teleprompter
+// Load teleprompter safely
 function loadTeleprompter(name){
-  const data = JSON.parse(localStorage.getItem('teleprompter_' + name));
-  if(!data) return;
+  const key = 'teleprompter_' + name;
+  const dataStr = localStorage.getItem(key);
+  if(!dataStr) return alert("Teleprompter not found!");
+  const data = JSON.parse(dataStr);
   teleText.innerHTML = data.content;
   fontSize.value = data.fontSize;
   fontFamily.value = data.fontFamily;
