@@ -67,7 +67,7 @@ const preview = document.getElementById('preview');
 const colorBtn = document.getElementById('colorBtn');
 const alignSelect = document.getElementById('alignSelect');
 
-// Track formatting states
+// Formatting states
 let boldActive = false;
 let italicActive = false;
 let selectedColor = colorBtn.value;
@@ -78,13 +78,13 @@ teleText.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); italicActive = !italicActive; updatePreview(); }
 });
 
-// Update selected color live
+// Color updates live
 colorBtn.addEventListener('input', () => { selectedColor = colorBtn.value; updatePreview(); });
 
-// Update alignment
+// Alignment change
 alignSelect.addEventListener('change', () => updatePreview());
 
-// Update preview: formatting only in preview
+// Update preview only
 function updatePreview() {
   const text = teleText.innerText;
   let formattedText = text;
@@ -99,7 +99,7 @@ function updatePreview() {
   updateFullscreen();
 }
 
-// Open fullscreen
+// Open fullscreen with smooth scroll
 function openFullscreen() {
   if (!fullscreenWindow || fullscreenWindow.closed) {
     fullscreenWindow = window.open('', 'fullscreenTeleprompter', 'width=800,height=600');
@@ -112,30 +112,31 @@ function openFullscreen() {
           body {
             margin:0; background:black; color:white; padding:50px;
             font-size:${fontSize.value}px; font-family:${fontFamily.value};
-            line-height:${lineHeight.value}; text-align:${alignSelect.value}; white-space:pre-wrap;
+            line-height:${lineHeight.value}; text-align:${alignSelect.value};
+            white-space:pre-wrap; overflow-y:auto;
           }
         </style>
       </head>
       <body id="content">${preview.innerHTML}</body>
       <script>
         let scrollSpeed = 0;
-        let animationId;
-
-        function scrollStep() {
-          if(scrollSpeed!==0) { window.scrollBy(0, scrollSpeed); }
-          animationId = requestAnimationFrame(scrollStep);
+        function scrollLoop() {
+          if(scrollSpeed!==0) window.scrollBy(0, scrollSpeed);
+          requestAnimationFrame(scrollLoop);
         }
-        scrollStep();
+        scrollLoop();
 
         document.addEventListener('keydown', e => {
-          switch(e.key) {
-            case '1': scrollSpeed = 1; break;
-            case '2': scrollSpeed = 3; break;
-            case '3': scrollSpeed = 6; break;
-            case '4': scrollSpeed = -1; break;
-            case '5': scrollSpeed = -3; break;
-            case '6': scrollSpeed = -6; break;
-            case ' ': scrollSpeed = 0; break;
+          // Prevent default for spacebar
+          if(e.key===' ') e.preventDefault();
+          switch(e.key){
+            case '1': scrollSpeed=1; break;
+            case '2': scrollSpeed=3; break;
+            case '3': scrollSpeed=6; break;
+            case '4': scrollSpeed=-1; break;
+            case '5': scrollSpeed=-3; break;
+            case '6': scrollSpeed=-6; break;
+            case ' ': scrollSpeed=0; break;
             case '0': window.scrollTo({top:0}); break;
           }
         });
@@ -154,7 +155,7 @@ function openFullscreen() {
   }
 }
 
-// Update fullscreen
+// Update fullscreen content
 function updateFullscreen() {
   if (fullscreenWindow && !fullscreenWindow.closed) {
     fullscreenWindow.postMessage({
