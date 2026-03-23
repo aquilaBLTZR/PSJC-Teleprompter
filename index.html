@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSJC Teleprompter</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+<style>
+  body { font-family: Arial; margin:0; display:flex; height:100vh; }
+  #editor { width:30%; padding:10px; box-sizing:border-box; border-right:2px solid #ccc; overflow-y:auto; background:#f8f8f8; }
+  #editor h2 { font-size:18px; margin-bottom:10px; }
+  #editor label { display:block; font-size:12px; margin-top:8px; }
+  #editor input, #editor select, #editor button { width:100%; padding:5px; margin-top:3px; font-size:14px; box-sizing:border-box; }
+  #teleText { height:100px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; }
+  #fullscreenBtn { margin-top:10px; font-size:14px; }
+  #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; }
+</style>
+</head>
+<body>
+
+<div id="editor">
+  <h2>PSJC Teleprompter</h2>
+
+  <label>Text:</label>
+  <div id="teleText" contenteditable="true">Hello, this is your teleprompter text.</div>
+
+  <label>Font Size (px):</label>
+  <input type="number" id="fontSize" value="48" min="10">
+
+  <label>Font Family:</label>
+  <select id="fontFamily">
+    <option value="Arial">Arial</option>
+    <option value="Verdana">Verdana</option>
+    <option value="Tahoma">Tahoma</option>
+    <option value="Courier New">Courier New</option>
+    <option value="Times New Roman">Times New Roman</option>
+    <option value="Montserrat">Montserrat</option>
+  </select>
+
+  <label>Line Height:</label>
+  <input type="number" id="lineHeight" value="1.5" step="0.1">
+
+  <label>Text Alignment:</label>
+  <select id="alignSelect">
+    <option value="left">Left</option>
+    <option value="center">Center</option>
+    <option value="right">Right</option>
+  </select>
+
+  <label>Selected Text Color:</label>
+  <input type="color" id="colorBtn" value="#ffffff">
+
+  <button id="fullscreenBtn">Go Fullscreen</button>
+</div>
+
+<div id="preview" contenteditable="false"></div>
+
+<script>
+let fullscreenWindow = null;
+
+const teleText = document.getElementById('teleText');
+const fontSize = document.getElementById('fontSize');
+const fontFamily = document.getElementById('fontFamily');
+const lineHeight = document.getElementById('lineHeight');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const preview = document.getElementById('preview');
+const colorBtn = document.getElementById('colorBtn');
+const alignSelect = document.getElementById('alignSelect');
+
+// Save and restore selection
+function saveSelection() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) return sel.getRangeAt(0).cloneRange();
+  return null;
+}
+function restoreSelection(range) {
+  if (range) {
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+
+// Apply color to selected text without changing editor code
+function applyColor(color) {
+  const range = saveSelection();
+  if (!range || range.collapsed) return;
+  const span = document.createElement('span');
+  span.style.color = color;
+  span.appendChild(range.extractContents());
+  range.insertNode(span);
+  const newRange = document.createRange();
+  newRange.selectNodeContents(span);
+  restoreSelection(newRange);
+  updatePreview();
+}
+
+// Apply alignment
+function applyAlignment(alignment) {
+  preview.style.textAlign = alignment;
+  teleText.style.textAlign = alignment;
+  updateFullscreen();
+}
+
+// Keyboard shortcuts
+teleText.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') { e.preventDefault(); document.execCommand('bold'); updatePreview(); }
+  if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); document.execCommand('italic'); updatePreview(); }
+});
+
+// Live color update while dragging
+colorBtn.addEventListener('input', () => applyColor(colorBtn.value));
+
+// Alignment change
+alignSelect.addEventListener('change', () => applyAlignment(alignSelect.value));
+
+// Update preview
+function updatePreview() {
+  preview.innerHTML = teleText.innerHTML;
+  preview.style.fontSize = fontSize.value + 'px';
+  preview.style.fontFamily = fontFamily.value;
+  preview.style.lineHeight = lineHeight.value;
+  updateFullscreen();
+}
+
+// Fullscreen
+function openFullscreen() {
+  if (!fullscreenWindow || fullscreenWindow.closed) {
+    fullscreenWindow = window.open('', 'fullscreenTeleprompter', 'width=800,height=600');
+    fullscreenWindow.document.write(`
+      <html>
+      <head>
+        <title>PSJC Teleprompter</title>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+        <style>
+          body {
+            margin:0; background:black; color:white;
+            font-size:${fontSize.value}px;
+            font-family:${fontFamily.value};
+            line-height:${lineHeight.value};
+            padding:50px;
+            text-align:${alignSelect.value};
+          }
+        </style>
+      </head>
+      <body id="content">${preview.innerHTML}</body>
+      <script>
+        document.addEventListener('keydown', e => { if(e.key==='ArrowDown') window.scrollBy(0,5); if(e.key==='ArrowUp') window.scrollBy(0,-5); });
+        document.addEventListener('wheel', e => window.scrollBy(0,e.deltaY));
+        window.addEventListener('message', e => {
+          if(e.data.content!==undefined) document.getElementById('content').innerHTML=e.data.content;
+          if(e.data.fontSize!==undefined) document.body.style.fontSize=e.data.fontSize+'px';
+          if(e.data.fontFamily!==undefined) document.body.style.fontFamily=e.data.fontFamily;
+          if(e.data.lineHeight!==undefined) document.body.style.lineHeight=e.data.lineHeight;
+          if(e.data.align!==undefined) document.body.style.textAlign=e.data.align;
+        });
+      <\/script>
+      </html>
+    `);
+    fullscreenWindow.document.close();
+  }
+}
+
+function updateFullscreen() {
+  if (fullscreenWindow && !fullscreenWindow.closed) {
+    fullscreenWindow.postMessage({
+      content: preview.innerHTML,
+      fontSize: fontSize.value,
+      fontFamily: fontFamily.value,
+      lineHeight: lineHeight.value,
+      align: alignSelect.value
+    }, '*');
+  }
+}
+
+// Event listeners
+[teleText, fontSize, fontFamily, lineHeight].forEach(el => {
+  el.addEventListener('input', updatePreview);
+  el.addEventListener('change', updatePreview);
+});
+fullscreenBtn.addEventListener('click', openFullscreen);
+
+// Initial render
+updatePreview();
+</script>
+
+</body>
+</html>
