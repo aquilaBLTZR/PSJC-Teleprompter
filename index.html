@@ -7,10 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
 <style>
   body { font-family: Arial; margin:0; display:flex; height:100vh; }
-  #editor { 
-    width:30%; padding:10px; box-sizing:border-box; border-right:2px solid #ccc; 
-    overflow-y:auto; background:white; color:black;  /* Editor area white */
-  }
+  #editor { width:30%; padding:10px; box-sizing:border-box; border-right:2px solid #ccc; overflow-y:auto; background:white; color:black; }
   #editor h2 { font-size:18px; margin-bottom:10px; }
   #editor label { display:block; font-size:12px; margin-top:8px; }
   #editor input, #editor select, #editor button { width:100%; padding:5px; margin-top:3px; font-size:14px; box-sizing:border-box; transition: transform 0.2s; }
@@ -18,6 +15,12 @@
   #teleText { height:150px; font-family:inherit; padding:5px; border:1px solid #ccc; overflow-y:auto; background:white; color:black; }
   #fullscreenBtn { margin-top:10px; font-size:14px; }
   #preview { width:70%; background:black; color:white; padding:20px; overflow-y:auto; text-align:left; white-space:pre-wrap; }
+  #playlist { margin-top:15px; border-top:1px solid #ccc; padding-top:10px; }
+  #playlist h3 { margin:5px 0; }
+  #playlist ul { list-style:none; padding-left:0; max-height:200px; overflow-y:auto; }
+  #playlist li { margin:3px 0; display:flex; justify-content:space-between; align-items:center; cursor:move; }
+  #playlist button { width:auto; margin-left:5px; padding:2px 5px; font-size:12px; }
+  .dragging { opacity:0.5; }
 </style>
 </head>
 <body>
@@ -55,13 +58,20 @@
   <input type="color" id="colorBtn" value="#ffffff">
 
   <button id="fullscreenBtn">Go Fullscreen</button>
+
+  <hr>
+  <h3>Playlist</h3>
+  <input type="text" id="saveName" placeholder="Enter teleprompter name">
+  <button id="saveBtn">Save</button>
+  <button id="importBtn">Import</button>
+  <ul id="playlistList"></ul>
 </div>
 
 <div id="preview" contenteditable="false"></div>
 
 <script>
 let fullscreenWindow = null;
-
+let currentLoadedName = null; // Keep track of currently loaded teleprompter
 const teleText = document.getElementById('teleText');
 const fontSize = document.getElementById('fontSize');
 const fontFamily = document.getElementById('fontFamily');
@@ -70,8 +80,11 @@ const fullscreenBtn = document.getElementById('fullscreenBtn');
 const preview = document.getElementById('preview');
 const colorBtn = document.getElementById('colorBtn');
 const alignSelect = document.getElementById('alignSelect');
+const saveBtn = document.getElementById('saveBtn');
+const importBtn = document.getElementById('importBtn');
+const saveName = document.getElementById('saveName');
+const playlistList = document.getElementById('playlistList');
 
-// Formatting states
 let boldActive = false;
 let italicActive = false;
 let selectedColor = colorBtn.value;
@@ -82,15 +95,15 @@ teleText.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'i') { e.preventDefault(); italicActive = !italicActive; updatePreview(); }
 });
 
-// Color updates live
+// Live color
 colorBtn.addEventListener('input', () => { selectedColor = colorBtn.value; updatePreview(); });
 
 // Alignment change
 alignSelect.addEventListener('change', () => updatePreview());
 
-// Update preview only
+// Preview update
 function updatePreview() {
-  const text = teleText.innerText;
+  let text = teleText.innerHTML;
   let formattedText = text;
   if (boldActive) formattedText = `<b>${formattedText}</b>`;
   if (italicActive) formattedText = `<i>${formattedText}</i>`;
@@ -101,9 +114,10 @@ function updatePreview() {
   preview.style.lineHeight = lineHeight.value;
   preview.style.textAlign = alignSelect.value;
   updateFullscreen();
+  autoSaveCurrent();
 }
 
-// Open fullscreen with smooth scroll
+// Fullscreen
 function openFullscreen() {
   if (!fullscreenWindow || fullscreenWindow.closed) {
     fullscreenWindow = window.open('', 'fullscreenTeleprompter', 'width=800,height=600');
@@ -113,38 +127,26 @@ function openFullscreen() {
         <title>PSJC Teleprompter</title>
         <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
         <style>
-          body {
-            margin:0; background:black; color:white; padding:50px;
-            font-size:${fontSize.value}px; font-family:${fontFamily.value};
-            line-height:${lineHeight.value}; text-align:${alignSelect.value};
-            white-space:pre-wrap; overflow-y:auto;
-          }
+          body { margin:0; background:black; color:white; padding:50px;
+                 font-size:${fontSize.value}px; font-family:${fontFamily.value};
+                 line-height:${lineHeight.value}; text-align:${alignSelect.value};
+                 white-space:pre-wrap; overflow-y:auto; }
         </style>
       </head>
       <body id="content">${preview.innerHTML}</body>
       <script>
         let scrollSpeed = 0;
-        function scrollLoop() {
-          if(scrollSpeed!==0) window.scrollBy(0, scrollSpeed);
-          requestAnimationFrame(scrollLoop);
-        }
+        function scrollLoop(){ if(scrollSpeed!==0) window.scrollBy(0,scrollSpeed); requestAnimationFrame(scrollLoop); }
         scrollLoop();
-
-        document.addEventListener('keydown', e => {
-          if(e.key===' ') e.preventDefault(); // Prevent default scroll
+        document.addEventListener('keydown', e=>{
+          if(e.key===' ') e.preventDefault();
           switch(e.key){
-            case '1': scrollSpeed=1; break;
-            case '2': scrollSpeed=3; break;
-            case '3': scrollSpeed=6; break;
-            case '4': scrollSpeed=-1; break;
-            case '5': scrollSpeed=-3; break;
-            case '6': scrollSpeed=-6; break;
-            case ' ': scrollSpeed=0; break;
-            case '0': window.scrollTo({top:0}); break;
+            case '1': scrollSpeed=1; break; case '2': scrollSpeed=3; break; case '3': scrollSpeed=6; break;
+            case '4': scrollSpeed=-1; break; case '5': scrollSpeed=-3; break; case '6': scrollSpeed=-6; break;
+            case ' ': scrollSpeed=0; break; case '0': window.scrollTo({top:0}); break;
           }
         });
-
-        window.addEventListener('message', e => {
+        window.addEventListener('message', e=>{
           if(e.data.content!==undefined) document.getElementById('content').innerHTML=e.data.content;
           if(e.data.fontSize!==undefined) document.body.style.fontSize=e.data.fontSize+'px';
           if(e.data.fontFamily!==undefined) document.body.style.fontFamily=e.data.fontFamily;
@@ -171,6 +173,111 @@ function updateFullscreen() {
   }
 }
 
+// Save teleprompter
+saveBtn.addEventListener('click', () => {
+  const name = saveName.value.trim();
+  if(!name) return alert("Enter a name!");
+  saveTeleprompter(name);
+  saveName.value='';
+});
+
+// Import button
+importBtn.addEventListener('click', () => {
+  if(playlistOrder.length === 0) return alert("No saved teleprompters to import.");
+  let firstName = playlistOrder[0];
+  loadTeleprompter(firstName);
+});
+
+// Save function
+function saveTeleprompter(name){
+  const data = {
+    content: teleText.innerHTML,
+    fontSize: fontSize.value,
+    fontFamily: fontFamily.value,
+    lineHeight: lineHeight.value,
+    align: alignSelect.value,
+    bold: boldActive,
+    italic: italicActive,
+    color: selectedColor
+  };
+  localStorage.setItem('teleprompter_' + name, JSON.stringify(data));
+  if(!playlistOrder.includes(name)) playlistOrder.push(name);
+  localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
+  currentLoadedName = name;
+  loadPlaylist();
+}
+
+// Auto-save currently loaded teleprompter
+function autoSaveCurrent(){
+  if(currentLoadedName) saveTeleprompter(currentLoadedName);
+}
+
+// Playlist management
+let playlistOrder = JSON.parse(localStorage.getItem('playlistOrder') || '[]');
+function loadPlaylist(){
+  playlistList.innerHTML = '';
+  playlistOrder.forEach(name=>{
+    if(!localStorage.getItem('teleprompter_'+name)) return;
+    const li = document.createElement('li'); li.draggable=true;
+    li.innerHTML = `<span>${name}</span>`;
+    const loadBtn = document.createElement('button'); loadBtn.textContent='Load';
+    loadBtn.onclick = ()=>loadTeleprompter(name);
+    const deleteBtn = document.createElement('button'); deleteBtn.textContent='Delete';
+    deleteBtn.onclick = ()=>{
+      localStorage.removeItem('teleprompter_'+name);
+      playlistOrder = playlistOrder.filter(n=>n!==name);
+      localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
+      if(currentLoadedName===name) currentLoadedName=null;
+      loadPlaylist();
+    };
+    li.appendChild(loadBtn); li.appendChild(deleteBtn);
+    playlistList.appendChild(li);
+
+    // Drag events
+    li.addEventListener('dragstart', e=>{ li.classList.add('dragging'); });
+    li.addEventListener('dragend', e=>{
+      li.classList.remove('dragging');
+      const newOrder = Array.from(playlistList.querySelectorAll('li span')).map(s=>s.textContent);
+      playlistOrder = newOrder;
+      localStorage.setItem('playlistOrder', JSON.stringify(playlistOrder));
+    });
+    li.addEventListener('dragover', e=>{
+      e.preventDefault();
+      const dragging = playlistList.querySelector('.dragging');
+      const after = getDragAfterElement(playlistList, e.clientY);
+      if(after==null) playlistList.appendChild(dragging);
+      else playlistList.insertBefore(dragging, after);
+    });
+  });
+}
+
+// Drag helper
+function getDragAfterElement(container, y){
+  const draggableElements = [...container.querySelectorAll('li:not(.dragging)')];
+  return draggableElements.reduce((closest, child)=>{
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height/2;
+    if(offset<0 && offset>closest.offset) return {offset:offset, element:child};
+    return closest;
+  }, {offset:Number.NEGATIVE_INFINITY}).element || null;
+}
+
+// Load teleprompter
+function loadTeleprompter(name){
+  const data = JSON.parse(localStorage.getItem('teleprompter_' + name));
+  if(!data) return;
+  teleText.innerHTML = data.content;
+  fontSize.value = data.fontSize;
+  fontFamily.value = data.fontFamily;
+  lineHeight.value = data.lineHeight;
+  alignSelect.value = data.align;
+  boldActive = data.bold;
+  italicActive = data.italic;
+  selectedColor = data.color;
+  currentLoadedName = name;
+  updatePreview();
+}
+
 // Event listeners
 [teleText, fontSize, fontFamily, lineHeight].forEach(el => {
   el.addEventListener('input', updatePreview);
@@ -180,6 +287,7 @@ fullscreenBtn.addEventListener('click', openFullscreen);
 
 // Initial render
 updatePreview();
+loadPlaylist();
 </script>
 
 </body>
